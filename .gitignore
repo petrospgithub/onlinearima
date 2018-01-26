@@ -1,0 +1,13 @@
+.idea/*
+.checkpoint/*
+target/*
+OARIMA_spark.iml
+data/arimaogd/*
+data/arimaogd_london/*
+data/arimaons/*
+data/octave/*
+data/arma_mm
+data/london_id10_example
+data/spain_blmd_8s_6852347.csv
+OARIMA_GradieentDescent_Brest/*
+OARIMA_NetwonStep_Brest/*

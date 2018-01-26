@@ -1,0 +1,1 @@
+java -jar $AVRO compile schema Point3D.avsc <destination path>
