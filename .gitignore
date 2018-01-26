@@ -11,3 +11,4 @@ data/london_id10_example
 data/spain_blmd_8s_6852347.csv
 OARIMA_GradieentDescent_Brest/*
 OARIMA_NetwonStep_Brest/*
+confluent/*
