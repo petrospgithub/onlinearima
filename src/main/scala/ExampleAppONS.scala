@@ -10,7 +10,7 @@ import scala.io.Source
 
 object ExampleAppONS extends App{
 
-  val filename = getClass.getResource("6852347_flight.csv")
+  val filename = getClass.getResource("")
   val input: InputStream = new FileInputStream(filename.getPath)
 
   val source = Source.fromInputStream(input)

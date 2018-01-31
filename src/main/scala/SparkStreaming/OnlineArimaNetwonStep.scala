@@ -7,11 +7,13 @@ import java.util.Properties
 import java.util.concurrent.ThreadLocalRandom
 
 import onlinearima.OARIMA_ons
-import org.apache.commons.math3.linear.{MatrixUtils, RealMatrix}
+import org.apache.commons.math3.linear.{AbstractRealMatrix, Array2DRowRealMatrix, MatrixUtils, RealMatrix}
 import org.apache.spark.SparkConf
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SaveMode
 import org.apache.spark.streaming.{Seconds, State, StateSpec, StreamingContext}
 import points.AvroPoint
-import utils.{Copy, Interpolation, MobilityChecker}
+import utils.{Copy, Interpolation, MobilityChecker, SparkSessionSingleton}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.util.parsing.json.JSONArray
@@ -50,11 +52,6 @@ object OnlineArimaNetwonStep {
     val epsilonVar=ssc.sparkContext.broadcast(Math.pow(temp.head.toDouble, temp.last.toDouble))
 
     val prediction_counter = ssc.sparkContext.longAccumulator("prediction_counter")
-    val prediction_linear = ssc.sparkContext.longAccumulator("prediction_linear")
-    val prediction_quadratic = ssc.sparkContext.longAccumulator("prediction_quadratic")
-    val prediction_polynomial = ssc.sparkContext.longAccumulator("prediction_polynomial")
-    val prediction_circle = ssc.sparkContext.longAccumulator("prediction_circle")
-    val prediction_ellipse = ssc.sparkContext.longAccumulator("prediction_ellipse")
 
     val prediction_error_counter = ssc.sparkContext.longAccumulator("prediction_error_counter")
 
@@ -107,7 +104,7 @@ object OnlineArimaNetwonStep {
             j=j+1
           }
 
-          OARIMAstate_ons(ArrayBuffer(new_point), RealMatrix, RealMatrix, MatrixUtils.createRealDiagonalMatrix(eye), MatrixUtils.createRealDiagonalMatrix(eye), w_lon, w_lat, 1, new AvroPoint, new_point)
+          OARIMAstate_ons(ArrayBuffer(new_point), new Array2DRowRealMatrix, new Array2DRowRealMatrix, MatrixUtils.createRealDiagonalMatrix(eye), MatrixUtils.createRealDiagonalMatrix(eye), w_lon, w_lat, 1, new AvroPoint, new_point)
 
         } else {
           state.get().state.filterNot(_.getTimestamp == new_point.getTimestamp) += new_point
@@ -118,7 +115,7 @@ object OnlineArimaNetwonStep {
           val w_lat=OARIMA_ons.adapt_w(oarima.prediction.getLatitude, new_point.getLatitude,oarima.w_lat,lrateVar.value, oarima.A_trans_lat, oarima.lat, oarima.i)
 
 
-          OARIMAstate_ons(ArrayBuffer(new_point),RealMatrix, RealMatrix, w_lon._2, w_lat._2, w_lon._1, w_lat._1, oarima.i+1, oarima.prediction, new_point)
+          OARIMAstate_ons(ArrayBuffer(new_point),new Array2DRowRealMatrix, new Array2DRowRealMatrix, w_lon._2, w_lat._2, w_lon._1, w_lat._1, oarima.i+1, oarima.prediction, new_point)
         }
 
       } else {
@@ -134,7 +131,7 @@ object OnlineArimaNetwonStep {
           j=j+1
         }
 
-        OARIMAstate_ons(ArrayBuffer(new_point), RealMatrix, RealMatrix, MatrixUtils.createRealDiagonalMatrix(eye), MatrixUtils.createRealDiagonalMatrix(eye), w_lon, w_lat, 1, new AvroPoint, new_point)
+        OARIMAstate_ons(ArrayBuffer(new_point), new Array2DRowRealMatrix, new Array2DRowRealMatrix, MatrixUtils.createRealDiagonalMatrix(eye), MatrixUtils.createRealDiagonalMatrix(eye), w_lon, w_lat, 1, new AvroPoint, new_point)
       }
 
       val prediction_result: ArrayBuffer[AvroPoint] = new ArrayBuffer[AvroPoint]()
@@ -290,20 +287,20 @@ object OnlineArimaNetwonStep {
     val stateDstream = pointDstream.mapWithState(
       StateSpec.function(mappingFunc))
 
+    stateDstream.foreachRDD { (rdd: RDD[String]) =>
+      val spark = SparkSessionSingleton.getInstance(rdd.sparkContext.getConf)
+      import spark.implicits._
 
-    stateDstream.saveAsTextFiles("OARIMA_NetwonStep_Brest/output_historical_positions" + prop.getProperty("window") + "_predicted_locations" + prop.getProperty("Horizon") +
-      "/results", "")
+      val temp = rdd.toDF()
+
+      temp.write.mode(SaveMode.Append).parquet("predictions_parquet_OARIMA_NetwonStep_output_historical_positions" + prop.getProperty("window") + "_predicted_locations" + prop.getProperty("Horizon")+"_"+args(1).split("/").last )
+    }
+
 
     ssc.start()
     ssc.awaitTermination()
 
     println(prediction_counter)
-    println(prediction_linear)
-    println(prediction_quadratic)
-    println(prediction_polynomial)
-    println(prediction_circle)
-    println(prediction_ellipse)
-
     println(prediction_error_counter)
   }
 }

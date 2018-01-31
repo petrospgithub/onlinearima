@@ -16,7 +16,7 @@ import scala.io.Source
   */
 object ExampleAppOGD extends App{
 
-  val filename = getClass.getResource("london_10_full.csv")
+  val filename = getClass.getResource("")
   val input: InputStream = new FileInputStream(filename.getPath)
 
   val source = Source.fromInputStream(input)

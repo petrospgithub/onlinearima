@@ -6,12 +6,14 @@ import java.time.format.DateTimeFormatter
 import java.util.Properties
 import java.util.concurrent.ThreadLocalRandom
 
-import onlinearima.OARIMA_ogd
-import org.apache.commons.math3.linear.{MatrixUtils, RealMatrix}
+import onlinearima.{OARIMA_ogd, RandomInit}
+import org.apache.commons.math3.linear.{Array2DRowRealMatrix, MatrixUtils}
 import org.apache.spark.SparkConf
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SaveMode
 import org.apache.spark.streaming.{Seconds, State, StateSpec, StreamingContext}
 import points.AvroPoint
-import utils.{Copy, Interpolation, MobilityChecker, PredictedPoint}
+import utils._
 
 import scala.collection.mutable.ArrayBuffer
 import scala.util.parsing.json.JSONArray
@@ -50,11 +52,6 @@ object OnlineArimaGradientDescent {
     val lrateVar=ssc.sparkContext.broadcast(prop.getProperty("l_rate").toDouble)
 
     val prediction_counter = ssc.sparkContext.longAccumulator("prediction_counter")
-    val prediction_linear = ssc.sparkContext.longAccumulator("prediction_linear")
-    val prediction_quadratic = ssc.sparkContext.longAccumulator("prediction_quadratic")
-    val prediction_polynomial = ssc.sparkContext.longAccumulator("prediction_polynomial")
-    val prediction_circle = ssc.sparkContext.longAccumulator("prediction_circle")
-    val prediction_ellipse = ssc.sparkContext.longAccumulator("prediction_ellipse")
 
     val prediction_error_counter = ssc.sparkContext.longAccumulator("prediction_error_counter")
 
@@ -94,19 +91,10 @@ object OnlineArimaGradientDescent {
 
         if (new_point.getTimestamp - points_state.state.last.getTimestamp > threshold_broadcastVar.value("GAP_PERIOD")) { //TODO gap threshold
 
-          val w_lon=new Array[Double](h)
-          val w_lat=new Array[Double](h)
-          //todo add w
-          var j=0
+          val w_lon=RandomInit.create_w(h)
+          val w_lat=RandomInit.create_w(h)
 
-          while (j<h) {
-            w_lon(j)=ThreadLocalRandom.current().nextInt(0, 100+1)/100.0
-            w_lat(j)=ThreadLocalRandom.current().nextInt(0, 100+1)/100.0
-
-            j=j+1
-          }
-
-          OARIMAstate(ArrayBuffer(new_point), RealMatrix, RealMatrix, w_lon, w_lat, 1, new AvroPoint, new_point)
+          OARIMAstate(ArrayBuffer(new_point), new Array2DRowRealMatrix, new Array2DRowRealMatrix, w_lon, w_lat, 1, new AvroPoint, new_point)
 
         } else {
           state.get().state.filterNot(_.getTimestamp == new_point.getTimestamp) += new_point
@@ -117,23 +105,14 @@ object OnlineArimaGradientDescent {
           val w_lat=OARIMA_ogd.adapt_w(oarima.prediction.getLatitude, new_point.getLatitude,oarima.w_lat,lrateVar.value, oarima.lat, oarima.i)
 
 
-          OARIMAstate(ArrayBuffer(new_point),RealMatrix, RealMatrix, w_lon, w_lat, oarima.i+1, oarima.prediction, new_point)
+          OARIMAstate(ArrayBuffer(new_point),new Array2DRowRealMatrix, new Array2DRowRealMatrix, w_lon, w_lat, oarima.i+1, oarima.prediction, new_point)
         }
 
       } else {
-        val w_lon=new Array[Double](h)
-        val w_lat=new Array[Double](h)
+        val w_lon=RandomInit.create_w(h)
+        val w_lat=RandomInit.create_w(h)
 
-        var j=0
-
-        while (j<h) {
-          w_lon(j)=ThreadLocalRandom.current().nextInt(0, 100+1)/100.0
-          w_lat(j)=ThreadLocalRandom.current().nextInt(0, 100+1)/100.0
-
-          j=j+1
-        }
-
-        OARIMAstate(ArrayBuffer(new_point), RealMatrix, RealMatrix, w_lon, w_lat, 1, new AvroPoint, new_point)
+        OARIMAstate(ArrayBuffer(new_point), new Array2DRowRealMatrix, new Array2DRowRealMatrix, w_lon, w_lat, 1, new AvroPoint, new_point)
       }
 
       val prediction_result: ArrayBuffer[AvroPoint] = new ArrayBuffer[AvroPoint]()
@@ -159,7 +138,6 @@ object OnlineArimaGradientDescent {
           }
         }
       }
-//todo apo edw kai katw dior8wnw
 
 
       val spline_length = spline.length
@@ -290,20 +268,19 @@ object OnlineArimaGradientDescent {
     val stateDstream = pointDstream.mapWithState(
       StateSpec.function(mappingFunc))
 
+    stateDstream.foreachRDD { (rdd: RDD[String]) =>
+      val spark = SparkSessionSingleton.getInstance(rdd.sparkContext.getConf)
+      import spark.implicits._
 
-    stateDstream.saveAsTextFiles("OARIMA_GradieentDescent_Brest/output_historical_positions" + prop.getProperty("window") + "_predicted_locations" + prop.getProperty("Horizon") +
-    "/results", "")
+      val temp = rdd.toDF()
+
+      temp.write.mode(SaveMode.Append).parquet("predictions_parquet_OARIMA_GradientDescent_output_historical_positions" + prop.getProperty("window") + "_predicted_locations" + prop.getProperty("Horizon")+"_"+args(1).split("/").last );
+    }
 
     ssc.start()
     ssc.awaitTermination()
 
     println(prediction_counter)
-    println(prediction_linear)
-    println(prediction_quadratic)
-    println(prediction_polynomial)
-    println(prediction_circle)
-    println(prediction_ellipse)
-
     println(prediction_error_counter)
   }
 }
