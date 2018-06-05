@@ -35,17 +35,17 @@ for w in window:
 
             os.system('timeout 11m spark-submit --master local[*] --driver-memory 12g '
                       '--properties-file "./config/onlinearima.properties" '
-                      '--class prediction.arma.OArimaGD '
+                      '--class prediction.arma.OARMAGD '
+                      './target/OnlineArimaTrajectory-jar-with-dependencies.jar ')
+
+            os.system('timeout 11m spark-submit --master local[*] --driver-memory 12g '
+                      '--properties-file "./config/onlinearima.properties" '
+                      '--class prediction.arma.OARMANS '
                       './target/OnlineArimaTrajectory-jar-with-dependencies.jar ')
 
             os.system('timeout 11m spark-submit --master local[*] --driver-memory 12g '
                       '--properties-file "./config/onlinearima.properties" '
                       '--class prediction.arima.OArimaGD '
-                      './target/OnlineArimaTrajectory-jar-with-dependencies.jar ')
-
-            os.system('timeout 11m spark-submit --master local[*] --driver-memory 12g '
-                      '--properties-file "./config/onlinearima.properties" '
-                      '--class prediction.arma.OArimaNS '
                       './target/OnlineArimaTrajectory-jar-with-dependencies.jar ')
 
             os.system('timeout 11m spark-submit --master local[*] --driver-memory 12g '
