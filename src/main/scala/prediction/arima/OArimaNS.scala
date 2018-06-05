@@ -41,7 +41,7 @@ object OArimaNS {
     val mode = prop.get("spark.mode")
     val topics = prop.get("spark.topics")
     val brokers = prop.get("spark.brokers")
-    val groupId = prop.get("spark.groupId")
+    val groupId = prop.get("spark.groupid")
 
 
     if (train_set>window) {
