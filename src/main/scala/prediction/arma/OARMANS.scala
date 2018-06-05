@@ -336,7 +336,7 @@ object OARMANS {
             }
           }
           foo.iterator
-        }), schema).write.mode(SaveMode.Append).parquet("predictions_parquet_OARMANSoutput_historical_positions" + broadcastHistory + "_predicted_locations" + broadcastHorizon + "_sampling_"+broadcastSampling+"_lrate_"+broadcastLRATE.toString.replace(".", "")+"_train_"+broadcastTrain+"_"+broadcastpath.value.replace(".csv", ""))
+        }), schema).write.mode(SaveMode.Append).parquet("predictions_parquet_OARMANSoutput_historical_positions" + broadcastHistory.value + "_predicted_locations" + broadcastHorizon.value + "_sampling_"+broadcastSampling.value+"_lrate_"+broadcastLRATE.value.toString.replace(".", "")+"_train_"+broadcastTrain.value+"_"+broadcastpath.value.replace(".csv", ""))
       }
     }
 
