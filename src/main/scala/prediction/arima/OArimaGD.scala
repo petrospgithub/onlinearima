@@ -55,7 +55,7 @@ object OArimaGD {
     val broadcastHorizon = ssc.sparkContext.broadcast(horizon)
     val broadcastLRATE = ssc.sparkContext.broadcast(lrate)
     val broadcastSpeedThres = ssc.sparkContext.broadcast(speed_threshold)
-
+    val broadcastpath=ssc.sparkContext.broadcast(path)
 
     /* Create (K=id,V=spatiotemporal point) for stateful streaming processing */
 
@@ -323,7 +323,7 @@ object OArimaGD {
             }
           }
           foo.iterator
-        }), schema).write.mode(SaveMode.Append).parquet("predictions_parquet_OArimaGDoutput_historical_positions" + broadcastHistory.value + "_predicted_locations" + broadcastHorizon.value + "_sampling_" + broadcastSampling.value + "_lrate_" + broadcastLRATE.value.toString.replace(".", "") + "_train_" + broadcastTrain.value)
+        }), schema).write.mode(SaveMode.Append).parquet("predictions_parquet_OArimaGDoutput_historical_positions" + broadcastHistory.value + "_predicted_locations" + broadcastHorizon.value + "_sampling_" + broadcastSampling.value + "_lrate_" + broadcastLRATE.value.toString.replace(".", "") + "_train_" + broadcastTrain.value+"_"++"_"+broadcastpath.value.replace(".csv",""))
       }
     }
 

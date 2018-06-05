@@ -43,7 +43,6 @@ object OArimaNS {
     val brokers = prop.get("spark.brokers")
     val groupId = prop.get("spark.groupid")
 
-
     if (train_set>window) {
       println("Window parameter must be greater than train_set")
       System.exit(1)
@@ -57,7 +56,7 @@ object OArimaNS {
     val broadcastLRATE=ssc.sparkContext.broadcast(lrate)
     val broadcastSpeedThres=ssc.sparkContext.broadcast(speed_threshold)
     val broadcastEpsilon=ssc.sparkContext.broadcast(epsilon)
-
+    val broadcastpath=ssc.sparkContext.broadcast(path)
     /* Create (K=id,V=spatiotemporal point) for stateful streaming processing */
 
     val pointDstream = mode match {
@@ -359,7 +358,7 @@ object OArimaNS {
             }
           }
           foo.iterator
-        }), schema).write.mode(SaveMode.Append).parquet("predictions_parquet_OArimaNSoutput_historical_positions" + broadcastHistory.value + "_predicted_locations" + broadcastHorizon.value + "_sampling_"+broadcastSampling.value+"_lrate_"+broadcastLRATE.value.toString.replace(".", "")+"_train_"+broadcastTrain.value)
+        }), schema).write.mode(SaveMode.Append).parquet("predictions_parquet_OArimaNSoutput_historical_positions" + broadcastHistory.value + "_predicted_locations" + broadcastHorizon.value + "_sampling_"+broadcastSampling.value+"_lrate_"+broadcastLRATE.value.toString.replace(".", "")+"_train_"+broadcastTrain.value+"_"+broadcastpath.value.replace(".csv",""))
       }
     }
 
