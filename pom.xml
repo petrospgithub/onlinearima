@@ -14,7 +14,7 @@
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-streaming_2.11</artifactId>
             <version>2.2.1</version>
-            <!--<scope>provided</scope>-->
+            <scope>provided</scope>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.apache.spark/spark-sql -->
@@ -22,6 +22,7 @@
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_2.11</artifactId>
             <version>2.2.1</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-math3 -->

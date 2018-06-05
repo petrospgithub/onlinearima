@@ -3,6 +3,7 @@ package utils
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
+
 object SparkSessionSingleton {
 
   @transient private var instance: SparkSession = _

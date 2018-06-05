@@ -1,32 +1,49 @@
 package onlinearima
 
 import org.apache.commons.math3.linear.{MatrixUtils, RealMatrix}
-import utils.Options
+//import utils.Options
 
 object OARIMA_ogd {
 
-  def adapt_w(prediction:Double, real:Double, w:Array[Double], lrate:Double, matrix:RealMatrix, curr_position:Int): Array[Double] = {
+  def adapt_w(prediction:Double, real:Double, w:Array[Double], lrate:Double, data:Array[Double], curr_position:Int): Array[Double] = {
+    val matrix=MatrixUtils.createRowRealMatrix(data)
     val w_matrix= MatrixUtils.createRowRealMatrix(w)
     val diff=prediction-real
 
+    //println(diff)
+    //println(lrate)
     var j=0
 
     while (j<w.length) {
+
+      //println( (matrix.getEntry(0,j)*2*diff/Math.sqrt(curr_position - w.length)) )
+
+      //todo pws paizw me to current position!!!
+
+     // println(matrix.getEntry(0,j))
+      //println(Math.sqrt(curr_position - w.length))
+     // println(2*diff/Math.sqrt(curr_position - w.length))
+
+
       w_matrix.setEntry(0,j,w_matrix.getEntry(0,j)- (matrix.getEntry(0,j)*2*diff/Math.sqrt(curr_position - w.length)) * lrate )
       j=j+1
     }
+
+    //println(w_matrix)
+
     w_matrix.getRow(0)
   }
 
-  def prediction(arr:Array[Double], w:Array[Double]): (Double, RealMatrix) = {
+  def prediction(arr:Array[Double], w:Array[Double]): Double= {
     val matrix = MatrixUtils.createRowRealMatrix(arr)
     val w_matrix= MatrixUtils.createRowRealMatrix(w)
 
     val prediction=w_matrix.multiply(matrix.transpose()).getEntry(0,0)
 
-    (prediction, matrix)
+    //(prediction, matrix)
+    prediction
   }
-
+/*
   def call(lon_arr:Array[Double], opt:Options, real_next:Double, curr_position:Int): (Double, RealMatrix) = {
     val lon_matrix = MatrixUtils.createRowRealMatrix(lon_arr)
     val w_matrix= MatrixUtils.createRowRealMatrix(opt.w)
@@ -47,6 +64,7 @@ object OARIMA_ogd {
 
     (lon_prediction,w_matrix)
   }
+  */
 /*
   val lon_arr=Array(2.1111, 2.1150, 2.1188)
 

@@ -12,3 +12,11 @@ data/spain_blmd_8s_6852347.csv
 OARIMA_GradieentDescent_Brest/*
 OARIMA_NetwonStep_Brest/*
 confluent/*
+check_point_structure/*
+_spark_metadata/*
+predictions/*
+spark-warehouse/*
+predictions_parquet_OARMAGDoutput_historical_positions*/*
+predictions_parquet_OARMANSoutput_historical_positions*/*
+predictions_parquet_OArimaGDoutput_historical_positions*/*
+predictions_parquet_OArimaNSoutput_historical_positions*/*

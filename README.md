@@ -12,5 +12,6 @@ window (points that algorithm needs for training)
 lrate
 epsilon (if using netwon step)
 horizon (future position locations to predict)
+sampling
 
 Dataset: http://chorochronos.datastories.org/?q=node/9

@@ -1,4 +1,4 @@
-package SparkStreaming
+package simulation
 
 import java.io.{FileInputStream, InputStream}
 
@@ -16,7 +16,7 @@ class CustomReceiver(val file:String)
   def onStart() {
     new Thread("Custom Receiver") {
       override def run() {
-        Thread.sleep(5000)
+        Thread.sleep(1000)
         receive() }
     }.start()
   }
