@@ -6,7 +6,7 @@ import org.apache.spark.sql.streaming._
 import types.{OArimastateGD, STPoint}
 import utils.{Copy, Interpolation, MobilityChecker}
 
-object StructuredOARIMAGD {
+object StructureOARIMAGD {
 
   def main(args: Array[String]): Unit = {
 
