@@ -340,6 +340,7 @@ object OARMANS {
       }
     }
 
+
     stateDstream.print()
     ssc.start()
     ssc.awaitTermination()

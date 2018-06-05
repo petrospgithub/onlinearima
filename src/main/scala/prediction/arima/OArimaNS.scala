@@ -362,6 +362,7 @@ object OArimaNS {
       }
     }
 
+
     stateDstream.print()
     ssc.start()
     ssc.awaitTermination()

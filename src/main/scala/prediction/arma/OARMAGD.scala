@@ -303,6 +303,7 @@ val broadcastpath=ssc.sparkContext.broadcast(path)
       }
     }
 
+
     //stateDstream.print()
     ssc.start()
     ssc.awaitTermination()
