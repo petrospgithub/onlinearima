@@ -1,10 +1,10 @@
-package structure
+package structure.arima
 
-import onlinearima.{OARIMA_ogd, OARIMA_ons}
+import onlinearima.OARIMA_ons
 import org.apache.commons.math3.linear.MatrixUtils
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.{GroupState, GroupStateTimeout, OutputMode}
-import types.{OArimastateGD, OArimastateNS, STPoint}
+import types.{OArimastateNS, STPoint}
 import utils.{Copy, Interpolation, MobilityChecker}
 
 object StructureOARIMANS {
@@ -195,8 +195,8 @@ object StructureOARIMANS {
           val data_lon=train.map(x=>x.longitude)
           val data_lat=train.map(x=>x.latitude)
 
-          val prediction_lon=OARIMA_ogd.prediction(data_lon, state_new.getterWLON())
-          val prediction_lat=OARIMA_ogd.prediction(data_lat,  state_new.getterWLAT())
+          val prediction_lon=OARIMA_ons.prediction(data_lon, state_new.getterWLON())
+          val prediction_lat=OARIMA_ons.prediction(data_lat,  state_new.getterWLAT())
 
           //point, diff, adapt!!!
 
@@ -226,6 +226,8 @@ object StructureOARIMANS {
           start=start+1
           splitAt=splitAt+1
         }
+
+        prediction_result(0) = state_new.history.last
 
         var predictions=1
 

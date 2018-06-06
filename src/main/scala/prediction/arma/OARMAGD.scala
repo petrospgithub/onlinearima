@@ -108,7 +108,7 @@ val broadcastpath=ssc.sparkContext.broadcast(path)
           val w_lon = linear.padTo(wLen, 0.0)
           val w_lat = linear.padTo(wLen, 0.0)
 
-          val temp_state = OArimastateGD(Array(new_point))
+          val temp_state:OArimastateGD = OArimastateGD(Array(new_point))
 
           temp_state.setterWLON(w_lon)
           temp_state.setterWLAT(w_lat)
@@ -132,7 +132,7 @@ val broadcastpath=ssc.sparkContext.broadcast(path)
         val w_lon = linear.padTo(wLen, 0.0)
         val w_lat = linear.padTo(wLen, 0.0)
 
-        val temp_state = OArimastateGD(Array(new_point))
+        val temp_state:OArimastateGD = OArimastateGD(Array(new_point))
 
         temp_state.setterWLON(w_lon)
         temp_state.setterWLAT(w_lat)

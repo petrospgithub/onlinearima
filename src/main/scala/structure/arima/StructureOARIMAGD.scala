@@ -1,4 +1,4 @@
-package structure
+package structure.arima
 
 import onlinearima.OARIMA_ogd
 import org.apache.spark.sql.SparkSession
@@ -75,7 +75,7 @@ object StructureOARIMAGD {
           val w_lon = linear.padTo(wLen, 0.0)
           val w_lat = linear.padTo(wLen, 0.0)
 
-          val temp_state = OArimastateGD(events.toArray)
+          val temp_state:OArimastateGD = OArimastateGD(events.toArray)
 
           temp_state.setterWLON(w_lon)
           temp_state.setterWLAT(w_lat)
@@ -97,7 +97,7 @@ object StructureOARIMAGD {
         val w_lon = linear.padTo(wLen, 0.0)
         val w_lat = linear.padTo(wLen, 0.0)
 
-        val temp_state = OArimastateGD(events.toArray)
+        val temp_state:OArimastateGD = OArimastateGD(events.toArray)
 
         temp_state.setterWLON(w_lon)
         temp_state.setterWLAT(w_lat)

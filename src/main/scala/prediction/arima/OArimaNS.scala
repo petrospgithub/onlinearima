@@ -1,6 +1,6 @@
 package prediction.arima
 
-import onlinearima.{OARIMA_ogd, OARIMA_ons}
+import onlinearima.OARIMA_ons
 import org.apache.commons.math3.linear.MatrixUtils
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -231,8 +231,8 @@ object OArimaNS {
           val data_lon=train.map(x=>x.longitude)
           val data_lat=train.map(x=>x.latitude)
 
-          val prediction_lon=OARIMA_ogd.prediction(data_lon, state_new.getterWLON()) //TODO
-          val prediction_lat=OARIMA_ogd.prediction(data_lat,  state_new.getterWLAT()) //TODO
+          val prediction_lon=OARIMA_ons.prediction(data_lon, state_new.getterWLON()) //TODO
+          val prediction_lat=OARIMA_ons.prediction(data_lat,  state_new.getterWLAT()) //TODO
 
           //point, diff, adapt!!!
 
@@ -263,6 +263,8 @@ object OArimaNS {
           splitAt=splitAt+1
         }
 
+        prediction_result(0) = state_new.history.last
+
         var predictions=1
 
         val data=spline.slice(spline.length-wLen, spline.length)
@@ -278,8 +280,8 @@ object OArimaNS {
           val point = STPoint(
             key,
             lastT + (predictions * sampling),
-            prediction_result(predictions - 1).longitude+OARIMA_ogd.prediction(data_lon, state_new.getterWLON()),
-            prediction_result(predictions - 1).latitude+OARIMA_ogd.prediction(data_lat, state_new.getterWLAT()),
+            prediction_result(predictions - 1).longitude+OARIMA_ons.prediction(data_lon, state_new.getterWLON()),
+            prediction_result(predictions - 1).latitude+OARIMA_ons.prediction(data_lat, state_new.getterWLAT()),
             0, 0, error = false
           )
 
