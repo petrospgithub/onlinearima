@@ -43,7 +43,7 @@ object OARMAGD {
     val brokers = prop.get("spark.brokers")
     val groupId = prop.get("spark.groupid")
 
-    if (train_set > window) {
+    if (train_set >= window) {
       println("Window parameter must be greater than train_set")
       System.exit(1)
     }

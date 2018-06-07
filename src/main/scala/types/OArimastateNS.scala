@@ -17,7 +17,7 @@ case class OArimastateNS(var history:Array[STPoint]) {
 
   def getterATransLAT():RealMatrix= A_TransLAT
 
-  def setterATransLAT(A_TransLAT:RealMatrix)=this.A_TransLON=A_TransLAT
+  def setterATransLAT(A_TransLAT:RealMatrix)=this.A_TransLAT=A_TransLAT
 
   def getterWLON():Array[Double]= w_lon
 

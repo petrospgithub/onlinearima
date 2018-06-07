@@ -43,7 +43,7 @@ object OArimaNS {
     val brokers = prop.get("spark.brokers")
     val groupId = prop.get("spark.groupid")
 
-    if (train_set>window) {
+    if (train_set>=window) {
       println("Window parameter must be greater than train_set")
       System.exit(1)
     }
@@ -98,7 +98,7 @@ object OArimaNS {
       val h=broadcastHistory.value
       val Horizon=broadcastHorizon.value
       val wLen=broadcastTrain.value
-
+      val epsilon=broadcastEpsilon.value
       /* Update Moving Object State */
 
       val state_new:OArimastateNS = if (state.exists()) {
@@ -164,7 +164,7 @@ object OArimaNS {
         temp_state
       }
 
-      val prediction_result: Array[STPoint] = new Array[STPoint](Horizon)
+      val prediction_result: Array[STPoint] = new Array[STPoint](Horizon+1)
 
       /* Fix Sampling */
 

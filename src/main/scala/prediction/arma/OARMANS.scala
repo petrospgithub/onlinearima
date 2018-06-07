@@ -44,7 +44,7 @@ object OARMANS {
     val groupId = prop.get("spark.groupid")
 
 
-    if (train_set>window) {
+    if (train_set>=window) {
       println("Window parameter must be greater than train_set")
       System.exit(1)
     }
@@ -165,7 +165,7 @@ object OARMANS {
         temp_state
       }
 
-      val prediction_result: Array[STPoint] = new Array[STPoint](Horizon)
+      val prediction_result: Array[STPoint] = new Array[STPoint](Horizon+1)
 
       /* Fix Sampling */
 
@@ -196,7 +196,7 @@ object OARMANS {
 
         /* Train Arima Model */
 
-        val v_spline=spline.slice(spline.length-wLen, spline.length)
+        val v_spline = spline.slice(spline.length - h, spline.length)
 
         while (splitAt < h) {
 
