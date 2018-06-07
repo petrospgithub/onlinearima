@@ -116,10 +116,10 @@ object OArimaNS {
           temp_state.setterWLON(w_lon)
           temp_state.setterWLAT(w_lat)
 
-          val eye=new Array[Double](window)
+          val eye=new Array[Double](wLen)
           var j=0
 
-          while (j<window) {
+          while (j<wLen) {
             eye(j)=epsilon
             j=j+1
           }
@@ -150,10 +150,10 @@ object OArimaNS {
         temp_state.setterWLAT(w_lat)
 
 
-        val eye=new Array[Double](window)
+        val eye=new Array[Double](wLen)
         var j=0
 
-        while (j<window) {
+        while (j<wLen) {
           eye(j)=epsilon
           j=j+1
         }
