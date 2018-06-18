@@ -42,6 +42,7 @@ object OARMAGD {
     val topics = prop.get("spark.topics")
     val brokers = prop.get("spark.brokers")
     val groupId = prop.get("spark.groupid")
+    val vectorinit = prop.get("spark.vectorinit")
 
     if (train_set >= window) {
       println("Window parameter must be greater than train_set")
@@ -55,7 +56,9 @@ object OARMAGD {
     val broadcastHorizon = ssc.sparkContext.broadcast(horizon)
     val broadcastLRATE = ssc.sparkContext.broadcast(lrate)
     val broadcastSpeedThres = ssc.sparkContext.broadcast(speed_threshold)
-val broadcastpath=ssc.sparkContext.broadcast(path)
+    val broadcastVector=ssc.sparkContext.broadcast(vectorinit)
+
+    val broadcastpath=ssc.sparkContext.broadcast(path)
 
     /* Create (K=id,V=spatiotemporal point) for stateful streaming processing */
 
@@ -104,9 +107,31 @@ val broadcastpath=ssc.sparkContext.broadcast(path)
 
         if (state.isTimingOut() || new_point.timestamp - state.get().history.last.timestamp > broadcastGAP.value) {
 
-          val linear = Array[Double](2.0, -1.0)
-          val w_lon = linear.padTo(wLen, 0.0)
-          val w_lat = linear.padTo(wLen, 0.0)
+          val w_lon:Array[Double]=broadcastVector.value match {
+            case "linear" =>
+              val linear = Array[Double](2.0, -1.0)
+              val w_lon = linear.padTo(wLen, 0.0)
+              w_lon
+            case "random" =>
+              val start = -100
+              val end   = 100
+              val rnd = new scala.util.Random
+
+              Array.fill(wLen){(start + rnd.nextInt( (end - start) + 1 ))/100.0 }
+          }
+
+          val w_lat:Array[Double]=broadcastVector.value match {
+            case "linear" =>
+              val linear = Array[Double](2.0, -1.0)
+              val w_lat = linear.padTo(wLen, 0.0)
+              w_lat
+            case "random" =>
+              val start = -100
+              val end   = 100
+              val rnd = new scala.util.Random
+
+              Array.fill(wLen){(start + rnd.nextInt( (end - start) + 1 ))/100.0 }
+          }
 
           val temp_state:OArimastateGD = OArimastateGD(Array(new_point))
 
@@ -128,9 +153,31 @@ val broadcastpath=ssc.sparkContext.broadcast(path)
 
       } else {
 
-        val linear = Array[Double](2.0, -1.0)
-        val w_lon = linear.padTo(wLen, 0.0)
-        val w_lat = linear.padTo(wLen, 0.0)
+        val w_lon:Array[Double]=broadcastVector.value match {
+          case "linear" =>
+            val linear = Array[Double](2.0, -1.0)
+            val w_lon = linear.padTo(wLen, 0.0)
+            w_lon
+          case "random" =>
+            val start = -100
+            val end   = 100
+            val rnd = new scala.util.Random
+
+            Array.fill(wLen){(start + rnd.nextInt( (end - start) + 1 ))/100.0 }
+        }
+
+        val w_lat:Array[Double]=broadcastVector.value match {
+          case "linear" =>
+            val linear = Array[Double](2.0, -1.0)
+            val w_lat = linear.padTo(wLen, 0.0)
+            w_lat
+          case "random" =>
+            val start = -100
+            val end   = 100
+            val rnd = new scala.util.Random
+
+            Array.fill(wLen){(start + rnd.nextInt( (end - start) + 1 ))/100.0 }
+        }
 
         val temp_state:OArimastateGD = OArimastateGD(Array(new_point))
 

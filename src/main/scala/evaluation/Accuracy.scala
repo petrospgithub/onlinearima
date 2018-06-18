@@ -17,20 +17,21 @@ object Accuracy {
     val prop=spark.sparkContext.getConf
     //prop.load(input)
 
-    val host = prop.get("host")
-    val user = prop.get("user")
-    val pass = prop.get("pass")
+    val host = prop.get("spark.host")
+    val user = prop.get("spark.user")
+    val pass = prop.get("spark.pass")
 
-    val insert=prop.get("query_insert")
-    val select=prop.get("query_select")
-    val path=prop.get("path")
-    val horizon=prop.get("horizon")
+    val insert=prop.get("spark.query_insert")
+    val select=prop.get("spark.query_select")
+    val path=prop.get("spark.path")
+    val horizon=prop.get("spark.horizon")
+    val table=prop.get("spark.table")
 
     val postgres: Broadcast[PostgresBroadcast] = {
       spark.sparkContext.broadcast(PostgresBroadcast(host,user,pass))
     }
 
-    val selectVar=spark.sparkContext.broadcast(select)
+    val selectVar=spark.sparkContext.broadcast(select.replace("table",table))
     val insertVar=spark.sparkContext.broadcast(insert)
     val pathVar=spark.sparkContext.broadcast(path)
     val error_counter=spark.sparkContext.longAccumulator("error_counter")
@@ -52,7 +53,7 @@ object Accuracy {
         )
 
 
-        val Horizon=record.getAs[Int](8)
+        val Horizon=record.getAs[Int](7)
 
         if (!predicted_point.error) {
           val rs = postgres.value.select(selectVar.value, predicted_point.id, predicted_point.timestamp)
