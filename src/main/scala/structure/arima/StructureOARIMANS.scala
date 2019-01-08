@@ -1,5 +1,5 @@
 package structure.arima
-
+/*
 import onlinearima.OARIMA_ons
 import org.apache.commons.math3.linear.MatrixUtils
 import org.apache.spark.sql.SparkSession
@@ -304,3 +304,4 @@ object StructureOARIMANS {
 
   }
 }
+*/

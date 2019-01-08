@@ -25,13 +25,43 @@ object OARIMA_ogd {
      // println(2*diff/Math.sqrt(curr_position - w.length))
 
 
-      w_matrix.setEntry(0,j,w_matrix.getEntry(0,j)- (matrix.getEntry(0,j)*2*diff/Math.sqrt(curr_position - w.length)) * lrate )
+      w_matrix.setEntry(0, j, w_matrix.getEntry(0,j) - (matrix.getEntry(0,j)*2*diff/Math.sqrt(curr_position - w.length)) * lrate )
       j=j+1
     }
 
     //println(w_matrix)
 
     w_matrix.getRow(0)
+  }
+
+
+  def adapt_w_diff(prediction:Double, real:Double, w:Array[Double], lrate:Double, data:Array[Double], curr_position:Int): (Array[Double],Double) = {
+    val matrix=MatrixUtils.createRowRealMatrix(data)
+    val w_matrix= MatrixUtils.createRowRealMatrix(w)
+    val diff=prediction-real
+
+    //println(diff)
+    //println(lrate)
+    var j=0
+
+    while (j<w.length) {
+
+      //println( (matrix.getEntry(0,j)*2*diff/Math.sqrt(curr_position - w.length)) )
+
+      //todo pws paizw me to current position!!!
+
+      // println(matrix.getEntry(0,j))
+      //println(Math.sqrt(curr_position - w.length))
+      // println(2*diff/Math.sqrt(curr_position - w.length))
+
+
+      w_matrix.setEntry(0, j, w_matrix.getEntry(0,j) - (matrix.getEntry(0,j)*2*diff/Math.sqrt(curr_position - w.length)) * lrate )
+      j=j+1
+    }
+
+    //println(w_matrix)
+
+    (w_matrix.getRow(0),diff)
   }
 
   def prediction(arr:Array[Double], w:Array[Double]): Double= {
@@ -43,6 +73,23 @@ object OARIMA_ogd {
     //(prediction, matrix)
     prediction
   }
+
+  def prediction(arr:Array[Double], w:Array[Double], diff:Double): Double= {
+    val matrix = MatrixUtils.createRowRealMatrix(arr)
+    val w_matrix= MatrixUtils.createRowRealMatrix(w)
+
+    val prediction=w_matrix.multiply(matrix.transpose()).getEntry(0,0)
+
+    //(prediction, matrix)
+    prediction
+
+    if (diff>0)
+      prediction-diff
+    else {
+      prediction+diff
+    }
+  }
+
 /*
   def call(lon_arr:Array[Double], opt:Options, real_next:Double, curr_position:Int): (Double, RealMatrix) = {
     val lon_matrix = MatrixUtils.createRowRealMatrix(lon_arr)

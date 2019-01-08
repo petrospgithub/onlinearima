@@ -1,4 +1,4 @@
-package prediction.arima
+package prediction.correction.arima
 
 import onlinearima.OARIMA_ogd
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -13,7 +13,7 @@ import simulation.CustomReceiver
 import types.{OArimastateGD, STPoint}
 import utils.{Copy, Interpolation, MobilityChecker, SparkSessionSingleton}
 
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
 object OArimaGD {
 
@@ -301,6 +301,10 @@ object OArimaGD {
 
 
         /* Train Arima Model */
+        val correctionLon=new ArrayBuffer[Double]()
+        val correctionLat=new ArrayBuffer[Double]()
+        val correctionSpeed=new ArrayBuffer[Double]()
+        val correctionHeading=new ArrayBuffer[Double]()
 
         while (splitAt < h) {
           val train = v_spline.slice(start, splitAt)
@@ -318,36 +322,41 @@ object OArimaGD {
           val prediction_speed=OARIMA_ogd.prediction(data_speed, state_new.w_speed.get) //TODO
           val prediction_heading=OARIMA_ogd.prediction(data_heading,  state_new.w_heading.get) //TODO
 
-          val new_wLon = OARIMA_ogd.adapt_w(
+          val new_wLon = OARIMA_ogd.adapt_w_diff(
             prediction_lon,
             test.longitude,
             state_new.w_lon.get, broadcastLRATE.value,
             data_lon, state_new.i.get
           )
-          val new_wLat = OARIMA_ogd.adapt_w(
+          val new_wLat = OARIMA_ogd.adapt_w_diff(
             prediction_lat,
             test.latitude,
             state_new.w_lat.get, broadcastLRATE.value,
             data_lat, state_new.i.get
           )
 
-          val new_wSpeed = OARIMA_ogd.adapt_w(
+          val new_wSpeed = OARIMA_ogd.adapt_w_diff(
             prediction_speed,
             test.speed,
             state_new.w_speed.get, broadcastLRATE.value,
             data_speed, state_new.i.get
           )
-          val new_wHeading = OARIMA_ogd.adapt_w(
+          val new_wHeading = OARIMA_ogd.adapt_w_diff(
             prediction_heading,
             test.heading,
             state_new.w_heading.get, broadcastLRATE.value,
             data_heading, state_new.i.get
           )
 
-          state_new.w_lon=Some(new_wLon)
-          state_new.w_lat=Some(new_wLat)
-          state_new.w_speed=Some(new_wSpeed)
-          state_new.w_heading=Some(new_wHeading)
+          state_new.w_lon=Some(new_wLon._1)
+          state_new.w_lat=Some(new_wLat._1)
+          state_new.w_speed=Some(new_wSpeed._1)
+          state_new.w_heading=Some(new_wHeading._1)
+
+          correctionLon.append(new_wLon._2)
+          correctionLat.append(new_wLat._2)
+          correctionSpeed.append(new_wSpeed._2)
+          correctionHeading.append(new_wHeading._2)
 
           start = start + 1
           splitAt = splitAt + 1
@@ -366,22 +375,26 @@ object OArimaGD {
         val data_speed=data.map(x=>x.speed)
         val data_heading=data.map(x=>x.heading)
 
+        val lonMeandiff=correctionLon.sum/correctionLon.length.toDouble
+        val latMeandiff=correctionLat.sum/correctionLat.length.toDouble
+        val speedMeandiff=correctionSpeed.sum/correctionSpeed.length.toDouble
+        val headingMeandiff=correctionHeading.sum/correctionHeading.length.toDouble
         /* Prediction */
         while (predictions <= Horizon) {
 
           val point = STPoint(
             key,
             lastT + (predictions * sampling),
-            prediction_result(predictions - 1).longitude+OARIMA_ogd.prediction(data_lon, state_new.w_lon.get),
-            prediction_result(predictions - 1).latitude+OARIMA_ogd.prediction(data_lat, state_new.w_lat.get),
-            prediction_result(predictions - 1).speed+OARIMA_ogd.prediction(data_speed, state_new.w_speed.get),
-            prediction_result(predictions - 1).heading+OARIMA_ogd.prediction(data_heading, state_new.w_heading.get),
+            prediction_result(predictions - 1).longitude+OARIMA_ogd.prediction(data_lon, state_new.w_lon.get, lonMeandiff),
+            prediction_result(predictions - 1).latitude+OARIMA_ogd.prediction(data_lat, state_new.w_lat.get, latMeandiff),
+            prediction_result(predictions - 1).speed+OARIMA_ogd.prediction(data_speed, state_new.w_speed.get, speedMeandiff),
+            prediction_result(predictions - 1).heading+OARIMA_ogd.prediction(data_heading, state_new.w_heading.get, headingMeandiff),
              error = false
           )
 
 
-         // val speed = MobilityChecker.getSpeedKnots(prediction_result(predictions - 1), point)
-        //  val heading = MobilityChecker.getBearing(prediction_result(predictions - 1), point)
+        //  val speed = MobilityChecker.getSpeedKnots(prediction_result(predictions - 1), point)
+         // val heading = MobilityChecker.getBearing(prediction_result(predictions - 1), point)
 
         //  point.speed = speed
         //  point.heading = heading

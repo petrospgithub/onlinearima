@@ -1,4 +1,4 @@
-package prediction.arima
+package prediction.correction.arma
 
 import onlinearima.OARIMA_ogd
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -11,16 +11,16 @@ import org.apache.spark.streaming._
 import org.apache.spark.streaming.kafka010._
 import simulation.CustomReceiver
 import types.{OArimastateGD, STPoint}
-import utils.{Copy, Interpolation, MobilityChecker, SparkSessionSingleton}
+import utils.{Copy, Interpolation, SparkSessionSingleton}
 
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
-object OArimaGD {
+object OARMAGD {
 
   def main(args: Array[String]): Unit = {
 
     val batchInterval = 1
-    val sparkConf = new SparkConf().setAppName("OArimaGD")
+    val sparkConf = new SparkConf().setAppName("OARMAGD")
 
     /* Spark Init */
     val ssc = new StreamingContext(sparkConf, Seconds(batchInterval.toInt))
@@ -43,7 +43,6 @@ object OArimaGD {
     val brokers = prop.get("spark.brokers")
     val groupId = prop.get("spark.groupid")
     val vectorinit = prop.get("spark.vectorinit")
-    val broadcastVector=ssc.sparkContext.broadcast(vectorinit)
 
     if (train_set >= window) {
       println("Window parameter must be greater than train_set")
@@ -57,6 +56,8 @@ object OArimaGD {
     val broadcastHorizon = ssc.sparkContext.broadcast(horizon)
     val broadcastLRATE = ssc.sparkContext.broadcast(lrate)
     val broadcastSpeedThres = ssc.sparkContext.broadcast(speed_threshold)
+    val broadcastVector=ssc.sparkContext.broadcast(vectorinit)
+
     val broadcastpath=ssc.sparkContext.broadcast(path)
 
     /* Create (K=id,V=spatiotemporal point) for stateful streaming processing */
@@ -158,6 +159,9 @@ object OArimaGD {
               Array.fill(wLen){(start + rnd.nextInt( (end - start) + 1 ))/100.0 }
           }
 
+
+          //  val temp_state:OArimastateGD = OArimastateGD(Array(new_point))
+
           val temp_state=OArimastateGD(Some(Array(new_point)),None,None,None,None,None)
 
           temp_state.w_lon=Some(w_lon)
@@ -232,6 +236,7 @@ object OArimaGD {
             Array.fill(wLen){(start + rnd.nextInt( (end - start) + 1 ))/100.0 }
         }
 
+
         val temp_state=OArimastateGD(Some(Array(new_point)),None,None,None,None,None)
 
         temp_state.w_lon=Some(w_lon)
@@ -274,33 +279,13 @@ object OArimaGD {
         var splitAt = broadcastTrain.value
         var start = 0
 
-        val v_spline:Array[STPoint] = if (spline.length==h) {
-
-          Array(STPoint(key, spline.head.timestamp,
-            0,
-            0,
-            spline.head.speed, spline.head.heading, spline.head.error
-          )) ++ spline.sliding(2).map(f=>{
-            STPoint(f.head.id, f.last.timestamp,
-              f.last.longitude-f.head.longitude,
-              f.last.latitude-f.head.latitude,
-              f.last.speed-f.head.speed, f.last.heading-f.head.heading, f.last.error
-            )
-          })
-
-        } else {
-          spline.slice(spline.length - h-1, spline.length).sliding(2).map(f=>{
-
-            STPoint(f.head.id, f.last.timestamp,
-              f.last.longitude-f.head.longitude,
-              f.last.latitude-f.head.latitude,
-              f.last.speed-f.head.speed, f.last.heading-f.head.heading, f.last.error
-            )
-          }).toArray
-        }
-
+        val v_spline = spline.slice(spline.length - h, spline.length)
 
         /* Train Arima Model */
+        val correctionLon=new ArrayBuffer[Double]()
+        val correctionLat=new ArrayBuffer[Double]()
+        val correctionSpeed=new ArrayBuffer[Double]()
+        val correctionHeading=new ArrayBuffer[Double]()
 
         while (splitAt < h) {
           val train = v_spline.slice(start, splitAt)
@@ -318,36 +303,41 @@ object OArimaGD {
           val prediction_speed=OARIMA_ogd.prediction(data_speed, state_new.w_speed.get) //TODO
           val prediction_heading=OARIMA_ogd.prediction(data_heading,  state_new.w_heading.get) //TODO
 
-          val new_wLon = OARIMA_ogd.adapt_w(
+          val new_wLon = OARIMA_ogd.adapt_w_diff(
             prediction_lon,
             test.longitude,
             state_new.w_lon.get, broadcastLRATE.value,
             data_lon, state_new.i.get
           )
-          val new_wLat = OARIMA_ogd.adapt_w(
+          val new_wLat = OARIMA_ogd.adapt_w_diff(
             prediction_lat,
             test.latitude,
             state_new.w_lat.get, broadcastLRATE.value,
             data_lat, state_new.i.get
           )
 
-          val new_wSpeed = OARIMA_ogd.adapt_w(
+          val new_wSpeed = OARIMA_ogd.adapt_w_diff(
             prediction_speed,
             test.speed,
             state_new.w_speed.get, broadcastLRATE.value,
             data_speed, state_new.i.get
           )
-          val new_wHeading = OARIMA_ogd.adapt_w(
+          val new_wHeading = OARIMA_ogd.adapt_w_diff(
             prediction_heading,
             test.heading,
             state_new.w_heading.get, broadcastLRATE.value,
             data_heading, state_new.i.get
           )
 
-          state_new.w_lon=Some(new_wLon)
-          state_new.w_lat=Some(new_wLat)
-          state_new.w_speed=Some(new_wSpeed)
-          state_new.w_heading=Some(new_wHeading)
+          state_new.w_lon=Some(new_wLon._1)
+          state_new.w_lat=Some(new_wLat._1)
+          state_new.w_speed=Some(new_wSpeed._1)
+          state_new.w_heading=Some(new_wHeading._1)
+
+          correctionLon.append(new_wLon._2)
+          correctionLat.append(new_wLat._2)
+          correctionSpeed.append(new_wSpeed._2)
+          correctionHeading.append(new_wHeading._2)
 
           start = start + 1
           splitAt = splitAt + 1
@@ -361,10 +351,15 @@ object OArimaGD {
 
         val data_lon = data.map(x => x.longitude)
         val data_lat = data.map(x => x.latitude)
-        val lastT = v_spline.last.timestamp
 
         val data_speed=data.map(x=>x.speed)
         val data_heading=data.map(x=>x.heading)
+        val lastT = v_spline.last.timestamp
+
+        val lonMeandiff=correctionLon.sum/correctionLon.length.toDouble
+        val latMeandiff=correctionLat.sum/correctionLat.length.toDouble
+        val speedMeandiff=correctionSpeed.sum/correctionSpeed.length.toDouble
+        val headingMeandiff=correctionHeading.sum/correctionHeading.length.toDouble
 
         /* Prediction */
         while (predictions <= Horizon) {
@@ -372,19 +367,20 @@ object OArimaGD {
           val point = STPoint(
             key,
             lastT + (predictions * sampling),
-            prediction_result(predictions - 1).longitude+OARIMA_ogd.prediction(data_lon, state_new.w_lon.get),
-            prediction_result(predictions - 1).latitude+OARIMA_ogd.prediction(data_lat, state_new.w_lat.get),
-            prediction_result(predictions - 1).speed+OARIMA_ogd.prediction(data_speed, state_new.w_speed.get),
-            prediction_result(predictions - 1).heading+OARIMA_ogd.prediction(data_heading, state_new.w_heading.get),
+            OARIMA_ogd.prediction(data_lon, state_new.w_lon.get, lonMeandiff),
+            OARIMA_ogd.prediction(data_lat, state_new.w_lat.get, latMeandiff),
+
+            OARIMA_ogd.prediction(data_speed, state_new.w_speed.get, speedMeandiff),
+            OARIMA_ogd.prediction(data_heading, state_new.w_heading.get, headingMeandiff),
              error = false
           )
 
 
          // val speed = MobilityChecker.getSpeedKnots(prediction_result(predictions - 1), point)
-        //  val heading = MobilityChecker.getBearing(prediction_result(predictions - 1), point)
+         // val heading = MobilityChecker.getBearing(prediction_result(predictions - 1), point)
 
-        //  point.speed = speed
-        //  point.heading = heading
+         // point.speed = speed
+         // point.heading = heading
 
           /*Error Checker*/
 
@@ -452,7 +448,7 @@ object OArimaGD {
             }
           }
           foo.iterator
-        }), schema).write.mode(SaveMode.Append).parquet("predictions_parquet_OArimaGDoutput_historical_positions" + broadcastHistory.value + "_predicted_locations" + broadcastHorizon.value + "_sampling_" + broadcastSampling.value + "_lrate_" + broadcastLRATE.value.toString.replace(".", "") + "_train_" + broadcastTrain.value+"_"+broadcastpath.value.replace(".csv",""))
+        }), schema).write.mode(SaveMode.Append).parquet("predictions_parquet_OARMAGDoutput_historical_positions" + broadcastHistory.value + "_predicted_locations" + broadcastHorizon.value + "_sampling_" + broadcastSampling.value + "_lrate_" + broadcastLRATE.value.toString.replace(".", "") + "_train_" + broadcastTrain.value+"_"+broadcastpath.value.replace(".csv",""))
       }
     }
 

@@ -12,7 +12,7 @@ import org.apache.spark.streaming.kafka010.{ConsumerStrategies, KafkaUtils, Loca
 import org.apache.spark.streaming.{Seconds, State, StateSpec, StreamingContext}
 import simulation.CustomReceiver
 import types.{OArimastateNS, STPoint}
-import utils.{Copy, Interpolation, MobilityChecker, SparkSessionSingleton}
+import utils.{Copy, Interpolation, SparkSessionSingleton}
 
 import scala.collection.mutable.ListBuffer
 
@@ -69,7 +69,7 @@ object OARMANS {
           val point: Array[String] = record.split(",")
           (point(0).toInt, STPoint(
             point(0).toInt, point(1).toLong, point(2).toDouble, point(3).toDouble,
-            0.0, 0.0, error = false)
+            point(4).toDouble, point(5).toDouble, error = false)
           )
         })
       case "kafka" =>
@@ -89,7 +89,7 @@ object OARMANS {
           val point: Array[String] = record.value().split(",")
           (point(0).toInt, STPoint(
             point(0).toInt, point(1).toLong, point(2).toDouble, point(3).toDouble,
-            0.0, 0.0, error = false)
+            point(4).toDouble, point(5).toDouble, error = false)
           )
         })
     }
@@ -107,7 +107,7 @@ object OARMANS {
 
       val state_new:OArimastateNS = if (state.exists()) {
 
-        if (state.isTimingOut() || new_point.timestamp - state.get().history.last.timestamp > broadcastGAP.value) {
+        if (state.isTimingOut() || new_point.timestamp - state.get().history.get.last.timestamp > broadcastGAP.value) {
 
           val w_lon:Array[Double]=broadcastVector.value match {
             case "linear" =>
@@ -135,23 +135,53 @@ object OARMANS {
               Array.fill(wLen){(start + rnd.nextInt( (end - start) + 1 ))/100.0 }
           }
 
-          val temp_state=OArimastateNS(Array(new_point))
+          val w_speed:Array[Double]=broadcastVector.value match {
+            case "linear" =>
+              val linear = Array[Double](2.0, -1.0)
+              val w_lat = linear.padTo(wLen, 0.0)
+              w_lat
+            case "random" =>
+              val start = -100
+              val end   = 100
+              val rnd = new scala.util.Random
 
-          //Array(new_point)
+              Array.fill(wLen){(start + rnd.nextInt( (end - start) + 1 ))/100.0 }
+          }
 
-          temp_state.setterWLON(w_lon)
-          temp_state.setterWLAT(w_lat)
+          val w_heading:Array[Double]=broadcastVector.value match {
+            case "linear" =>
+              val linear = Array[Double](2.0, -1.0)
+              val w_lat = linear.padTo(wLen, 0.0)
+              w_lat
+            case "random" =>
+              val start = -100
+              val end   = 100
+              val rnd = new scala.util.Random
+
+              Array.fill(wLen){(start + rnd.nextInt( (end - start) + 1 ))/100.0 }
+          }
+
+
+          val temp_state=OArimastateNS(Some(Array(new_point)),None,None,None,None,None,None,None,None)
+
+          temp_state.w_lon=Some(w_lon)
+          temp_state.w_lat=Some(w_lat)
+          temp_state.w_speed=Some(w_speed)
+          temp_state.w_heading=Some(w_heading)
 
           val eye=new Array[Double](wLen)
           var j=0
 
           while (j<wLen) {
-            eye(j)=epsilon
+            eye(j)=broadcastEpsilon.value
             j=j+1
           }
 
-          temp_state.setterATransLON(MatrixUtils.createRealDiagonalMatrix(eye))
-          temp_state.setterATransLAT(MatrixUtils.createRealDiagonalMatrix(eye))
+          temp_state.A_TransLON=Some(MatrixUtils.createRealDiagonalMatrix(eye))
+          temp_state.A_TransLAT=Some(MatrixUtils.createRealDiagonalMatrix(eye))
+
+          temp_state.A_TransSPEED=Some(MatrixUtils.createRealDiagonalMatrix(eye))
+          temp_state.A_TransHEADING=Some(MatrixUtils.createRealDiagonalMatrix(eye))
 
           temp_state
         } else {
@@ -159,7 +189,7 @@ object OARMANS {
           val temp_state:OArimastateNS=state.get()
           val arr=temp_state.history
 
-          temp_state.history=arr.padTo(arr.length+1, new_point)
+          temp_state.history=Some(arr.get.padTo(arr.get.length+1, new_point))
 
           temp_state
         }
@@ -192,22 +222,54 @@ object OARMANS {
             Array.fill(wLen){(start + rnd.nextInt( (end - start) + 1 ))/100.0 }
         }
 
-        val temp_state=OArimastateNS(Array(new_point))
+        val w_speed:Array[Double]=broadcastVector.value match {
+          case "linear" =>
+            val linear = Array[Double](2.0, -1.0)
+            val w_lat = linear.padTo(wLen, 0.0)
+            w_lat
+          case "random" =>
+            val start = -100
+            val end   = 100
+            val rnd = new scala.util.Random
 
-        temp_state.setterWLON(w_lon)
-        temp_state.setterWLAT(w_lat)
+            Array.fill(wLen){(start + rnd.nextInt( (end - start) + 1 ))/100.0 }
+        }
+
+        val w_heading:Array[Double]=broadcastVector.value match {
+          case "linear" =>
+            val linear = Array[Double](2.0, -1.0)
+            val w_lat = linear.padTo(wLen, 0.0)
+            w_lat
+          case "random" =>
+            val start = -100
+            val end   = 100
+            val rnd = new scala.util.Random
+
+            Array.fill(wLen){(start + rnd.nextInt( (end - start) + 1 ))/100.0 }
+        }
+
+
+        val temp_state=OArimastateNS(Some(Array(new_point)),None,None,None,None,None,None,None,None)
+
+        temp_state.w_lon=Some(w_lon)
+        temp_state.w_lat=Some(w_lat)
+        temp_state.w_speed=Some(w_speed)
+        temp_state.w_heading=Some(w_heading)
 
 
         val eye=new Array[Double](wLen)
         var j=0
 
         while (j<wLen) {
-          eye(j)=epsilon
+          eye(j)=broadcastEpsilon.value
           j=j+1
         }
 
-        temp_state.setterATransLON(MatrixUtils.createRealDiagonalMatrix(eye))
-        temp_state.setterATransLAT(MatrixUtils.createRealDiagonalMatrix(eye))
+        temp_state.A_TransLON=Some(MatrixUtils.createRealDiagonalMatrix(eye))
+        temp_state.A_TransLAT=Some(MatrixUtils.createRealDiagonalMatrix(eye))
+
+        temp_state.A_TransSPEED=Some(MatrixUtils.createRealDiagonalMatrix(eye))
+        temp_state.A_TransHEADING=Some(MatrixUtils.createRealDiagonalMatrix(eye))
 
         temp_state
       }
@@ -221,20 +283,20 @@ object OARMANS {
 
       //var i = 0
       var j = 0
-      while (j < state_new.history.length - 1 && !mode) {
-        val elapsedTime = state_new.history.apply(j+1).timestamp - state_new.history.apply(j).timestamp
+      while (j < state_new.history.get.length - 1 && !mode) {
+        val elapsedTime = state_new.history.get.apply(j+1).timestamp - state_new.history.get.apply(j).timestamp
         if (elapsedTime != sampling) mode = true
         j += 1
       }
 
       val spline: Array[STPoint] = if (mode) {
-        if (Math.floor((state_new.history.last.timestamp - state_new.history.head.timestamp) / sampling.toDouble).toInt + 1 > h) {
-          Interpolation.splinepolation2D(state_new.history.sortWith(_.timestamp < _.timestamp), sampling)
+        if (Math.floor((state_new.history.get.last.timestamp - state_new.history.get.head.timestamp) / sampling.toDouble).toInt + 1 > h) {
+          Interpolation.splinepolation2D(state_new.history.get.sortWith(_.timestamp < _.timestamp), sampling)
         } else {
           Array.empty
         }
       } else {
-        Copy.deepCopy(state_new.history.sortWith(_.timestamp < _.timestamp))
+        Copy.deepCopy(state_new.history.get.sortWith(_.timestamp < _.timestamp))
       }
 
       if (!spline.isEmpty && spline.length >= h) {
@@ -256,9 +318,15 @@ object OARMANS {
           val data_lon=train.map(x=>x.longitude)
           val data_lat=train.map(x=>x.latitude)
 
-          val prediction_lon=OARIMA_ons.prediction(data_lon, state_new.getterWLON()) //TODO
-          val prediction_lat=OARIMA_ons.prediction(data_lat,  state_new.getterWLAT()) //TODO
+          val data_speed=train.map(x=>x.speed)
+          val data_heading=train.map(x=>x.heading)
 
+          val prediction_lon=OARIMA_ons.prediction(data_lon, state_new.w_lon.get) //TODO
+          val prediction_lat=OARIMA_ons.prediction(data_lat,  state_new.w_lat.get) //TODO
+
+
+          val prediction_speed=OARIMA_ons.prediction(data_speed, state_new.w_speed.get) //TODO
+          val prediction_heading=OARIMA_ons.prediction(data_heading,  state_new.w_heading.get) //TODO
           //point, diff, adapt!!!
 
           //val diff=Distance.getHaversineDistance(prediction_lat,prediction_lon, test.latitude, test.longitude)
@@ -266,29 +334,54 @@ object OARMANS {
           val new_wALon=OARIMA_ons.adapt_w(
             prediction_lon,
             test.longitude,
-            state_new.getterWLON(), broadcastLRATE.value,
+            state_new.w_lon.get, broadcastLRATE.value,
             data_lon,
-            state_new.getterATransLON()
+            state_new.A_TransLON.get
           )
+
           val new_wALat=OARIMA_ons.adapt_w(
             prediction_lat,
             test.latitude,
-            state_new.getterWLAT(), broadcastLRATE.value,
+            state_new.w_lat.get, broadcastLRATE.value,
             data_lat,
-            state_new.getterATransLAT()
+            state_new.A_TransLAT.get
           )
 
-          state_new.setterWLON(new_wALon._1)
-          state_new.setterATransLON(new_wALon._2)
 
-          state_new.setterWLAT(new_wALat._1)
-          state_new.setterATransLAT(new_wALat._2)
+          val new_wAspeed=OARIMA_ons.adapt_w(
+            prediction_speed,
+            test.speed,
+            state_new.w_speed.get, broadcastLRATE.value,
+            data_speed,
+            state_new.A_TransSPEED.get
+          )
+
+          val new_wAheading=OARIMA_ons.adapt_w(
+            prediction_heading,
+            test.heading,
+            state_new.w_heading.get, broadcastLRATE.value,
+            data_heading,
+            state_new.A_TransHEADING.get
+          )
+
+          state_new.w_lon=Some(new_wALon._1)
+          state_new.A_TransLON=Some(new_wALon._2)
+
+          state_new.w_lat=Some(new_wALat._1)
+          state_new.A_TransLAT=Some(new_wALat._2)
+
+
+          state_new.w_speed=Some(new_wAspeed._1)
+          state_new.A_TransSPEED=Some(new_wAspeed._2)
+
+          state_new.w_heading=Some(new_wAheading._1)
+          state_new.A_TransHEADING=Some(new_wAheading._2)
 
           start=start+1
           splitAt=splitAt+1
         }
 
-        prediction_result(0) = state_new.history.last
+        prediction_result(0) = state_new.history.get.last
 
         var predictions=1
 
@@ -296,6 +389,10 @@ object OARMANS {
 
         val data_lon=data.map(x=>x.longitude)
         val data_lat=data.map(x=>x.latitude)
+
+        val data_speed=data.map(x=>x.speed)
+        val data_heading=data.map(x=>x.heading)
+
         val lastT=v_spline.last.timestamp
 
         /* Prediction */
@@ -305,17 +402,20 @@ object OARMANS {
           val point=STPoint(
             key,
             lastT+(predictions*sampling),
-            OARIMA_ons.prediction(data_lon, state_new.getterWLON()),
-            OARIMA_ons.prediction(data_lat,  state_new.getterWLAT()),
-            0, 0, error = false
+            OARIMA_ons.prediction(data_lon, state_new.w_lon.get),
+            OARIMA_ons.prediction(data_lat,  state_new.w_lat.get),
+
+            OARIMA_ons.prediction(data_speed, state_new.w_speed.get),
+            OARIMA_ons.prediction(data_heading,  state_new.w_heading.get),
+            error = false
           )
 
 
-          val speed=MobilityChecker.getSpeedKnots(prediction_result(predictions-1), point)
-          val heading=MobilityChecker.getBearing(prediction_result(predictions-1), point)
+      //    val speed=MobilityChecker.getSpeedKnots(prediction_result(predictions-1), point)
+       //   val heading=MobilityChecker.getBearing(prediction_result(predictions-1), point)
 
-          point.speed=speed
-          point.heading=heading
+         // point.speed=speed
+         // point.heading=heading
 
           /*Error Checker*/
 
@@ -336,9 +436,9 @@ object OARMANS {
 
       /* Update State */
 
-      if (state_new.history.length > h) {
-        val new_arr=state_new.history.slice(state_new.history.length-h, state_new.history.length)
-        state_new.history=new_arr
+      if (state_new.history.get.length > h) {
+        val new_arr=state_new.history.get.slice(state_new.history.get.length-h, state_new.history.get.length)
+        state_new.history=Some(new_arr)
         state.update(state_new)
       } else {
         state.update(state_new)

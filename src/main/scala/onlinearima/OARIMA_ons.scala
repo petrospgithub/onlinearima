@@ -53,6 +53,55 @@ object OARIMA_ons {
     (w_matrix.getRow(0), A_trans)
   }
 
+  def adapt_w_diff(prediction:Double, real:Double, w:Array[Double], lrate:Double, data:Array[Double], A_trans:RealMatrix /*curr_position:Int*/): (Array[Double], RealMatrix, Double) = {
+    val matrix=MatrixUtils.createRowRealMatrix(data)
+    val w_matrix= MatrixUtils.createRowRealMatrix(w)
+    val window=w.length
+    val grad=new Array[Double](window)
+    val diff=prediction-real
+    var j=0
+    //val eye=new Array[Double](window)
+
+    while (j<grad.length) {
+      grad(j)=2*matrix.getEntry(0,j)*diff
+      j=j+1
+    }
+
+    val grad_matrix=MatrixUtils.createRowRealMatrix(grad)
+    //val A_trans=MatrixUtils.createRealDiagonalMatrix(eye)
+
+    val var_1=A_trans.multiply(grad_matrix.transpose())
+      .multiply(grad_matrix)
+      .multiply(A_trans)
+
+    val var_2=grad_matrix
+      .multiply(A_trans)
+      .multiply(grad_matrix.transpose()).getEntry(0,0)+1
+
+    var m=0
+
+    while (m<var_1.getRowDimension){
+      var n=0
+      while (n<var_1.getColumnDimension) {
+        A_trans.setEntry(m,n, A_trans.getEntry(m,n)-var_1.getEntry(m,n)/var_2)
+        n=n+1
+      }
+      m=m+1
+    }
+
+    val correction_matrix=MatrixUtils.createRowRealMatrix(grad)
+      .multiply(A_trans)
+
+    j=0
+
+    while (j<window) {
+      w_matrix.setEntry(0,j,w_matrix.getEntry(0,j) - correction_matrix.getEntry(0,j)*lrate )
+      j=j+1
+    }
+
+    (w_matrix.getRow(0), A_trans, diff)
+  }
+
   def prediction(arr:Array[Double], w:Array[Double]): Double/*(Double, RealMatrix)*/ = {
     val matrix = MatrixUtils.createRowRealMatrix(arr)
     val w_matrix= MatrixUtils.createRowRealMatrix(w)
@@ -61,6 +110,20 @@ object OARIMA_ons {
 
     //(prediction, matrix)
     prediction
+  }
+
+  def prediction(arr:Array[Double], w:Array[Double], diff:Double): Double/*(Double, RealMatrix)*/ = {
+    val matrix = MatrixUtils.createRowRealMatrix(arr)
+    val w_matrix= MatrixUtils.createRowRealMatrix(w)
+
+    val prediction=w_matrix.multiply(matrix.transpose()).getEntry(0,0)
+
+    //(prediction, matrix)
+    if (diff>0)
+      prediction-diff
+    else {
+      prediction+diff
+    }
   }
 
   /*
