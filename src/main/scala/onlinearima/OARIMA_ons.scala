@@ -1,17 +1,21 @@
 package onlinearima
 
+import java.util
+
 import org.apache.commons.math3.linear.{MatrixUtils, RealMatrix}
 
 object OARIMA_ons {
 
   def adapt_w(prediction:Double, real:Double, w:Array[Double], lrate:Double, data:Array[Double], A_trans:RealMatrix /*curr_position:Int*/): (Array[Double], RealMatrix) = {
-    val matrix=MatrixUtils.createRowRealMatrix(data)
+    val matrix=MatrixUtils.createRowRealMatrix(data.reverse)
     val w_matrix= MatrixUtils.createRowRealMatrix(w)
     val window=w.length
     val grad=new Array[Double](window)
     val diff=prediction-real
     var j=0
     //val eye=new Array[Double](window)
+
+    //println("diff: "+diff)
 
     while (j<grad.length) {
       grad(j)=2*matrix.getEntry(0,j)*diff
@@ -50,11 +54,13 @@ object OARIMA_ons {
       j=j+1
     }
 
+    println("grad: "+util.Arrays.toString(grad))
+    println("Atrans: "+A_trans)
     (w_matrix.getRow(0), A_trans)
   }
 
   def adapt_w_diff(prediction:Double, real:Double, w:Array[Double], lrate:Double, data:Array[Double], A_trans:RealMatrix /*curr_position:Int*/): (Array[Double], RealMatrix, Double) = {
-    val matrix=MatrixUtils.createRowRealMatrix(data)
+    val matrix=MatrixUtils.createRowRealMatrix(data.reverse)
     val w_matrix= MatrixUtils.createRowRealMatrix(w)
     val window=w.length
     val grad=new Array[Double](window)
@@ -103,7 +109,7 @@ object OARIMA_ons {
   }
 
   def prediction(arr:Array[Double], w:Array[Double]): Double/*(Double, RealMatrix)*/ = {
-    val matrix = MatrixUtils.createRowRealMatrix(arr)
+    val matrix = MatrixUtils.createRowRealMatrix(arr.reverse)
     val w_matrix= MatrixUtils.createRowRealMatrix(w)
 
     val prediction=w_matrix.multiply(matrix.transpose()).getEntry(0,0)
@@ -113,7 +119,7 @@ object OARIMA_ons {
   }
 
   def prediction(arr:Array[Double], w:Array[Double], diff:Double): Double/*(Double, RealMatrix)*/ = {
-    val matrix = MatrixUtils.createRowRealMatrix(arr)
+    val matrix = MatrixUtils.createRowRealMatrix(arr.reverse)
     val w_matrix= MatrixUtils.createRowRealMatrix(w)
 
     val prediction=w_matrix.multiply(matrix.transpose()).getEntry(0,0)

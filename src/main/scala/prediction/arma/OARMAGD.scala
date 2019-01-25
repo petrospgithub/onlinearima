@@ -1,5 +1,7 @@
 package prediction.arma
 
+import java.util
+
 import onlinearima.OARIMA_ogd
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -11,7 +13,7 @@ import org.apache.spark.streaming._
 import org.apache.spark.streaming.kafka010._
 import simulation.CustomReceiver
 import types.{OArimastateGD, STPoint}
-import utils.{Copy, Interpolation, SparkSessionSingleton}
+import utils.{Copy, Interpolation, MobilityChecker, SparkSessionSingleton}
 
 import scala.collection.mutable.ListBuffer
 
@@ -25,6 +27,8 @@ object OARMAGD {
     /* Spark Init */
     val ssc = new StreamingContext(sparkConf, Seconds(batchInterval.toInt))
     ssc.checkpoint(".checkpoint")
+
+    ssc.sparkContext.setLogLevel("WARN")
 
     val prop = ssc.sparkContext.getConf
 
@@ -66,6 +70,7 @@ object OARMAGD {
       case "simulation" => ssc.receiverStream(new CustomReceiver(System.getProperty("user.dir") + "/data/" + path))
         .map(record => {
           val point: Array[String] = record.split(",")
+
           (point(0).toInt, STPoint(
             point(0).toInt, point(1).toLong, point(2).toDouble, point(3).toDouble,
             point(4).toDouble, point(5).toDouble, error = false)
@@ -249,7 +254,7 @@ object OARMAGD {
         temp_state
       }
 
-      val prediction_result: Array[STPoint] = new Array[STPoint](Horizon + 1)
+      val prediction_result: Array[STPoint] = new Array[STPoint](Horizon + wLen)
 
       /* Fix Sampling */
       val sampling = broadcastSampling.value
@@ -274,17 +279,23 @@ object OARMAGD {
         Copy.deepCopy(state_new.history.get.sortWith(_.timestamp < _.timestamp))
       }
 
+   //println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
+     //println("state_new.w_lon: "+util.Arrays.toString(state_new.w_lon.get))
+    // println("state_new.w_lat: "+util.Arrays.toString(state_new.w_lat.get))
+    // println("spline: "+ util.Arrays.toString(spline.asInstanceOf[Array[AnyRef]]))
+
       if (!spline.isEmpty && spline.length >= h) {
 
         var splitAt = broadcastTrain.value
         var start = 0
 
-        val v_spline = spline.slice(spline.length - h, spline.length)
+        val v_spline = spline.slice(spline.length - h, spline.length)//util.Arrays.copyOfRange(spline, spline.length - h, spline.length)//
 
         /* Train Arima Model */
 
         while (splitAt < h) {
-          val train = v_spline.slice(start, splitAt)
+          val train = v_spline.slice(start, splitAt)//util.Arrays.copyOfRange(v_spline, start, splitAt)//
           val test = v_spline(splitAt)
 
           val data_lon = train.map(x => x.longitude)
@@ -296,9 +307,23 @@ object OARMAGD {
           val prediction_lon=OARIMA_ogd.prediction(data_lon, state_new.w_lon.get) //TODO
           val prediction_lat=OARIMA_ogd.prediction(data_lat,  state_new.w_lat.get) //TODO
 
-          val prediction_speed=OARIMA_ogd.prediction(data_speed, state_new.w_speed.get) //TODO
-          val prediction_heading=OARIMA_ogd.prediction(data_heading,  state_new.w_heading.get) //TODO
+         val prediction_speed=OARIMA_ogd.prediction(data_speed, state_new.w_speed.get) //TODO
+         val prediction_heading=OARIMA_ogd.prediction(data_heading,  state_new.w_heading.get) //TODO
+/*
+          println("splitAt: "+splitAt)
 
+          println("data lon: "+util.Arrays.toString(data_lon))
+          println("data lat: "+util.Arrays.toString(data_lat))
+
+          println("train: "+util.Arrays.toString(train.asInstanceOf[Array[AnyRef]]))
+
+          println("real point: POINT("+test.longitude+" "+test.latitude+")")
+
+          println("prediction point: POINT("+prediction_lon+" "+prediction_lat+")")
+
+          println("havershine: "+MobilityChecker.getHaversineDistance(test.latitude, test.longitude, prediction_lat, prediction_lon))
+          println("euclidean: "+MobilityChecker.getEuclidean(test.latitude, test.longitude, prediction_lat, prediction_lon))
+*/
           val new_wLon = OARIMA_ogd.adapt_w(
             prediction_lon,
             test.longitude,
@@ -325,6 +350,12 @@ object OARMAGD {
             data_heading, state_new.i.get
           )
 
+/*
+          println("new_wLon: "+util.Arrays.toString(new_wLon))
+          println("new_wLat: "+util.Arrays.toString(new_wLat))
+
+          println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+*/
           state_new.w_lon=Some(new_wLon)
           state_new.w_lat=Some(new_wLat)
           state_new.w_speed=Some(new_wSpeed)
@@ -334,25 +365,29 @@ object OARMAGD {
           splitAt = splitAt + 1
         }
 
-        prediction_result(0) = state_new.history.get.last
+        //prediction_result(0) = state_new.history.get.last
 
-        var predictions = 1
-
-        val data = spline.slice(spline.length - wLen, spline.length)
-
-        val data_lon = data.map(x => x.longitude)
-        val data_lat = data.map(x => x.latitude)
-
-        val data_speed=data.map(x=>x.speed)
-        val data_heading=data.map(x=>x.heading)
+        var predictions = 0
         val lastT = v_spline.last.timestamp
+        var i=0
+        while (i<wLen) {
+          prediction_result(i)=v_spline(v_spline.length-wLen+i)
+          i=i+1
+        }
 
         /* Prediction */
-        while (predictions <= Horizon) {
+        while (predictions < Horizon) {
+
+          val data=prediction_result.slice(predictions,predictions+wLen)//util.Arrays.copyOfRange(prediction_result, predictions, predictions+wLen)
+
+          val data_lon = data.map(x => x.longitude)
+          val data_lat = data.map(x => x.latitude)
+          val data_speed=data.map(x=>x.speed)
+          val data_heading=data.map(x=>x.heading)
 
           val point = STPoint(
             key,
-            lastT + (predictions * sampling),
+            lastT + ((predictions+1) * sampling),
             OARIMA_ogd.prediction(data_lon, state_new.w_lon.get),
             OARIMA_ogd.prediction(data_lat, state_new.w_lat.get),
 
@@ -378,12 +413,19 @@ object OARMAGD {
             point.error = false
           }
 
-          prediction_result(predictions) = point
+          prediction_result(predictions+wLen) = point
 
           predictions = predictions + 1
         }
 
       }
+
+      val final_pred=prediction_result.slice(prediction_result.length-Horizon,prediction_result.length)
+
+    // println("prediction_result.toList: "+util.Arrays.toString(final_pred.asInstanceOf[Array[AnyRef]]))
+
+   // println("------------------------------------------------------------------")
+
 
       /* Update State */
       if (state_new.history.get.length > h) {
@@ -394,8 +436,7 @@ object OARMAGD {
         state.update(state_new)
       }
 
-
-      prediction_result
+      final_pred
     }
 
     val stateDstream = pointDstream.mapWithState(
@@ -425,8 +466,13 @@ object OARMAGD {
         spark.createDataFrame(rdd.flatMap(x => {
 
           val foo = new ListBuffer[Row]()
-          var j = 0
+          var j = 1
           if (x.head != null) {
+
+            if (x.head.timestamp==1452557977000L) {
+              System.exit(0)
+            }
+
             while (j < x.length) {
               val p = x(j)
               foo.append(Row(p.id, p.timestamp, p.longitude, p.latitude, p.speed, p.heading, p.error, j))

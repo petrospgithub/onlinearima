@@ -1,17 +1,21 @@
 package onlinearima
 
-import org.apache.commons.math3.linear.{MatrixUtils, RealMatrix}
-//import utils.Options
+import org.apache.commons.math3.linear.MatrixUtils
+  //import utils.Options
 
 object OARIMA_ogd {
 
   def adapt_w(prediction:Double, real:Double, w:Array[Double], lrate:Double, data:Array[Double], curr_position:Int): Array[Double] = {
-    val matrix=MatrixUtils.createRowRealMatrix(data)
+    val matrix=MatrixUtils.createRowRealMatrix(data.reverse)
     val w_matrix= MatrixUtils.createRowRealMatrix(w)
     val diff=prediction-real
 
-    //println(diff)
-    //println(lrate)
+   // println("diff: "+diff)
+   // println("i: "+curr_position)
+
+    //println(matrix)
+    //println(w_matrix)
+
     var j=0
 
     while (j<w.length) {
@@ -20,7 +24,7 @@ object OARIMA_ogd {
 
       //todo pws paizw me to current position!!!
 
-     // println(matrix.getEntry(0,j))
+//     println("matrix.getEntry(0,j): "+matrix.getEntry(0,j))
       //println(Math.sqrt(curr_position - w.length))
      // println(2*diff/Math.sqrt(curr_position - w.length))
 
@@ -36,7 +40,7 @@ object OARIMA_ogd {
 
 
   def adapt_w_diff(prediction:Double, real:Double, w:Array[Double], lrate:Double, data:Array[Double], curr_position:Int): (Array[Double],Double) = {
-    val matrix=MatrixUtils.createRowRealMatrix(data)
+    val matrix=MatrixUtils.createRowRealMatrix(data.reverse)
     val w_matrix= MatrixUtils.createRowRealMatrix(w)
     val diff=prediction-real
 
@@ -65,23 +69,28 @@ object OARIMA_ogd {
   }
 
   def prediction(arr:Array[Double], w:Array[Double]): Double= {
-    val matrix = MatrixUtils.createRowRealMatrix(arr)
+    val matrix = MatrixUtils.createRowRealMatrix(arr.reverse)
     val w_matrix= MatrixUtils.createRowRealMatrix(w)
 
     val prediction=w_matrix.multiply(matrix.transpose()).getEntry(0,0)
-
+/*
+    println("matrix: "+matrix)
+    println("w_matrix: "+w_matrix)
+    println("prediction: "+prediction)
+    println("prediction2: "+w_matrix.multiply(MatrixUtils.createRowRealMatrix(arr.reverse).transpose()).getEntry(0,0))
+*/
     //(prediction, matrix)
     prediction
   }
 
   def prediction(arr:Array[Double], w:Array[Double], diff:Double): Double= {
-    val matrix = MatrixUtils.createRowRealMatrix(arr)
+    val matrix = MatrixUtils.createRowRealMatrix(arr.reverse)
     val w_matrix= MatrixUtils.createRowRealMatrix(w)
 
     val prediction=w_matrix.multiply(matrix.transpose()).getEntry(0,0)
 
     //(prediction, matrix)
-    prediction
+    //prediction
 
     if (diff>0)
       prediction-diff

@@ -1,5 +1,7 @@
 package prediction.arima
 
+import java.util
+
 import onlinearima.OARIMA_ogd
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -25,6 +27,8 @@ object OArimaGD {
     /* Spark Init */
     val ssc = new StreamingContext(sparkConf, Seconds(batchInterval.toInt))
     ssc.checkpoint(".checkpoint")
+
+    ssc.sparkContext.setLogLevel("WARN")
 
     val prop = ssc.sparkContext.getConf
 
@@ -65,6 +69,12 @@ object OArimaGD {
       case "simulation" => ssc.receiverStream(new CustomReceiver(System.getProperty("user.dir") + "/data/" + path))
         .map(record => {
           val point: Array[String] = record.split(",")
+
+
+          if (point(1).toLong==1452557976000L) {
+            System.exit(0)
+          }
+
           (point(0).toInt, STPoint(
             point(0).toInt, point(1).toLong, point(2).toDouble, point(3).toDouble,
             point(4).toDouble, point(5).toDouble, error = false)
@@ -85,6 +95,7 @@ object OArimaGD {
 
         messages.map(record => {
           val point: Array[String] = record.value().split(",")
+
           (point(0).toInt, STPoint(
             point(0).toInt, point(1).toLong, point(2).toDouble, point(3).toDouble,
             point(4).toDouble, point(5).toDouble, error = false)
@@ -244,7 +255,7 @@ object OArimaGD {
         temp_state
       }
 
-      val prediction_result: Array[STPoint] = new Array[STPoint](Horizon + 1)
+      val prediction_result: Array[STPoint] = new Array[STPoint](Horizon + wLen)
 
       /* Fix Sampling */
       val sampling = broadcastSampling.value
@@ -268,6 +279,14 @@ object OArimaGD {
       } else {
         Copy.deepCopy(state_new.history.get.sortWith(_.timestamp < _.timestamp))
       }
+
+    //  println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
+     // println("state_new.w_lon: "+state_new.w_lon)
+    //  println("state_new.w_lat: "+state_new.w_lat)
+    //  println("spline: "+ spline.toList)
+     // println("state_new.history.get.toList: "+ state_new.history.get.toList)
+
 
       if (!spline.isEmpty && spline.length >= h) {
 
@@ -318,6 +337,13 @@ object OArimaGD {
           val prediction_speed=OARIMA_ogd.prediction(data_speed, state_new.w_speed.get) //TODO
           val prediction_heading=OARIMA_ogd.prediction(data_heading,  state_new.w_heading.get) //TODO
 
+   //       println("splitAt: "+splitAt)
+   //       println("train: "+train.toList)
+
+    //      println("real point: POINT("+test.longitude+" "+test.latitude+")")
+
+      //    println("prediction point: POINT("+prediction_lon+" "+prediction_lat+")")
+
           val new_wLon = OARIMA_ogd.adapt_w(
             prediction_lon,
             test.longitude,
@@ -344,6 +370,9 @@ object OArimaGD {
             data_heading, state_new.i.get
           )
 
+      //    println("new_wLon: "+new_wLon.toList)
+      //    println("new_wLat: "+new_wLat.toList)
+
           state_new.w_lon=Some(new_wLon)
           state_new.w_lat=Some(new_wLat)
           state_new.w_speed=Some(new_wSpeed)
@@ -352,7 +381,7 @@ object OArimaGD {
           start = start + 1
           splitAt = splitAt + 1
         }
-
+/*
         prediction_result(0) = state_new.history.get.last
 
         var predictions = 1
@@ -365,8 +394,12 @@ object OArimaGD {
 
         val data_speed=data.map(x=>x.speed)
         val data_heading=data.map(x=>x.heading)
+*/
+      //  println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
         /* Prediction */
+
+        /*
         while (predictions <= Horizon) {
 
           val point = STPoint(
@@ -400,8 +433,66 @@ object OArimaGD {
 
           predictions = predictions + 1
         }
+*/
 
+
+      //  println("v_spline: "+v_spline.toList)
+
+        var predictions = 0
+        val lastT = v_spline.last.timestamp
+        var i=0
+        while (i<wLen) {
+          prediction_result(i)=v_spline(v_spline.length-wLen+i)
+          i=i+1
+        }
+
+
+   //     println("prediction_result: "+prediction_result.toList)
+
+        /* Prediction */
+        while (predictions < Horizon) {
+
+          val data=prediction_result.slice(predictions,predictions+wLen)//util.Arrays.copyOfRange(prediction_result, predictions, predictions+wLen)
+
+          val data_lon = data.map(x => x.longitude)
+          val data_lat = data.map(x => x.latitude)
+          val data_speed=data.map(x=>x.speed)
+          val data_heading=data.map(x=>x.heading)
+
+          val point = STPoint(
+            key,
+            lastT + ((predictions+1) * sampling),
+            OARIMA_ogd.prediction(data_lon, state_new.w_lon.get),
+            OARIMA_ogd.prediction(data_lat, state_new.w_lat.get),
+
+            OARIMA_ogd.prediction(data_speed, state_new.w_speed.get),
+            OARIMA_ogd.prediction(data_heading, state_new.w_heading.get),
+            error = false
+          )
+          /*Error Checker*/
+
+          if (
+            point.speed > broadcastSpeedThres.value || point.speed.isNaN || point.speed.isInfinite /*|| p.getAltitude > 40000*/
+          ) {
+            point.error = true
+          } else {
+            point.error = false
+          }
+
+          prediction_result(predictions+wLen) = point
+
+          predictions = predictions + 1
+        }
       }
+
+      //todo 8elei ena bhma gia na bgazw apo tin diafora to point!
+
+      val final_pred=prediction_result.slice(prediction_result.length-Horizon,prediction_result.length)
+
+    //  println("final_pred: "+util.Arrays.toString(final_pred.asInstanceOf[Array[AnyRef]]))
+
+   //   println("------------------------------------------------------------------")
+
 
       /* Update State */
       if (state_new.history.get.length > h) {
@@ -412,8 +503,27 @@ object OArimaGD {
         state.update(state_new)
       }
 
+      var ij=0
+      var lastReal=state_new.history.get.last
 
-      prediction_result
+      if (final_pred.head!=null) {
+        while (ij < final_pred.length) {
+
+          final_pred(ij).longitude = final_pred(ij).longitude + lastReal.longitude
+          final_pred(ij).latitude = final_pred(ij).latitude + lastReal.latitude
+
+          lastReal=final_pred(ij)
+
+          ij = ij + 1
+        }
+      }
+
+     // println("final_pred: "+util.Arrays.toString(final_pred.asInstanceOf[Array[AnyRef]]))
+
+     // println("------------------------------------------------------------------")
+
+
+      final_pred
     }
 
     val stateDstream = pointDstream.mapWithState(
@@ -446,6 +556,11 @@ object OArimaGD {
           var j = 0
           if (x.head != null) {
             while (j < x.length) {
+
+              if (x.head.timestamp==1452557977000L) {
+                System.exit(0)
+              }
+
               val p = x(j)
               foo.append(Row(p.id, p.timestamp, p.longitude, p.latitude, p.speed, p.heading, p.error, j))
               j = j + 1

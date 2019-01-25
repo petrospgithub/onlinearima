@@ -11,7 +11,7 @@ import scala.io.Source
   * Created by ppetrou on 5/20/17.
   */
 class CustomReceiver(val file:String)
-  extends Receiver[String](StorageLevel.MEMORY_AND_DISK_2) {
+  extends Receiver[String](StorageLevel.MEMORY_ONLY) {
 
   def onStart() {
     new Thread("Custom Receiver") {
@@ -39,7 +39,7 @@ class CustomReceiver(val file:String)
         store(point_text)
       }
       counter+=1
-      //Thread.sleep(2)
+      Thread.sleep(100)
     }
 
     //br.close()

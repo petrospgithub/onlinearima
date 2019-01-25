@@ -67,6 +67,7 @@ object OARMANS {
       case "simulation" => ssc.receiverStream(new CustomReceiver(System.getProperty("user.dir") + "/data/" + path))
         .map(record => {
           val point: Array[String] = record.split(",")
+
           (point(0).toInt, STPoint(
             point(0).toInt, point(1).toLong, point(2).toDouble, point(3).toDouble,
             point(4).toDouble, point(5).toDouble, error = false)
@@ -489,6 +490,11 @@ object OARMANS {
           val foo = new ListBuffer[Row]()
           var j = 0
           if (x.head != null) {
+
+            if (x.head.timestamp==1452557976000L) {
+              System.exit(0)
+            }
+
             while (j < x.length) {
               val p = x(j)
               foo.append(Row(p.id, p.timestamp, p.longitude, p.latitude, p.speed, p.heading, p.error, j))
@@ -496,7 +502,7 @@ object OARMANS {
             }
           }
           foo.iterator
-        }), schema).write.mode(SaveMode.Append).parquet("predictions_parquet_OARMANSoutput_historical_positions" + broadcastHistory.value + "_predicted_locations" + broadcastHorizon.value + "_sampling_"+broadcastSampling.value+"_lrate_"+broadcastLRATE.value.toString.replace(".", "")+"_train_"+broadcastTrain.value+"_"+broadcastpath.value.replace(".csv", ""))
+        }), schema).write.mode(SaveMode.Append).parquet("correction_predictions_parquet_OARMANSoutput_historical_positions" + broadcastHistory.value + "_predicted_locations" + broadcastHorizon.value + "_sampling_"+broadcastSampling.value+"_lrate_"+broadcastLRATE.value.toString.replace(".", "")+"_train_"+broadcastTrain.value+"_"+broadcastpath.value.replace(".csv", ""))
       }
     }
 

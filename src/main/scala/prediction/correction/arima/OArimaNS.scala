@@ -66,6 +66,11 @@ object OArimaNS {
       case "simulation" => ssc.receiverStream(new CustomReceiver(System.getProperty("user.dir") + "/data/" + path))
         .map(record => {
           val point: Array[String] = record.split(",")
+
+          if (point(1).toLong==1452557976000L) {
+            System.exit(0)
+          }
+
           (point(0).toInt, STPoint(
             point(0).toInt, point(1).toLong, point(2).toDouble, point(3).toDouble,
             point(4).toDouble, point(5).toDouble, error = false)
@@ -522,7 +527,7 @@ object OArimaNS {
             }
           }
           foo.iterator
-        }), schema).write.mode(SaveMode.Append).parquet("predictions_parquet_OArimaNSoutput_historical_positions" + broadcastHistory.value + "_predicted_locations" + broadcastHorizon.value + "_sampling_"+broadcastSampling.value+"_lrate_"+broadcastLRATE.value.toString.replace(".", "")+"_train_"+broadcastTrain.value+"_"+broadcastpath.value.replace(".csv",""))
+        }), schema).write.mode(SaveMode.Append).parquet("correction_predictions_parquet_OArimaNSoutput_historical_positions" + broadcastHistory.value + "_predicted_locations" + broadcastHorizon.value + "_sampling_"+broadcastSampling.value+"_lrate_"+broadcastLRATE.value.toString.replace(".", "")+"_train_"+broadcastTrain.value+"_"+broadcastpath.value.replace(".csv",""))
       }
     }
 
